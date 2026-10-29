@@ -1,4 +1,4 @@
-# Secrets / local config
+# Local config, signing keys and Firebase config
 local.properties
 *.jks
 *.keystore
