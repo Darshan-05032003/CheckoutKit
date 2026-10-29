@@ -75,3 +75,27 @@ name is given in brackets.
 - Scope for improvement:
   - The code table covers the common NPCI and ISO 8583 codes, not every bank-specific code. Unrecognised ones fail safely as permanent gateway errors.
   - The built-in English messages are generic. The Android UI maps errors to `strings.xml` (feature 5), so they can be translated.
+
+## Feature: Pluggable gateway + FakeGateway
+- Attacks tried:
+  - Spoofed and tampered gateway answers: a capture for 1 paisa more than requested, a pending answer with a different amount, a status confirmation for another transaction id, a cancel for another transaction id.
+  - Malformed ids from a hostile gateway: empty, blank and 10,000-char transaction ids, which would have crashed the event constructors.
+  - Double refund: 20 concurrent refund calls; a refund before capture; a refund for a different amount; a refund of an unknown or pending transaction.
+  - Hiding money in flight: the host calling `cancel()` while the payment is pending.
+  - Lost responses: the gateway captures the money but the answer arrives after the client's timeout ("debited but shown as failed").
+  - Status-query failures during polling (network exceptions, adapter bugs) and gateways that never answer status calls.
+  - Gateway reporting "cancelled" for a charge that was never pending.
+- What broke:
+  - **High, found by the load test and fixed:** when every attempt timed out after the gateway had already captured, the session reported `Failed(Timeout)`. Under 10 % latency spikes, 2 of 2,000 payers were told "failed" although they had paid (they would likely pay again: a double charge). Root cause: no reconciliation after an unknown outcome.
+  - **Medium, design-time:** a gateway returning a blank or huge transaction id would make `PaymentEvent.Succeed` throw, crashing the checkout instead of failing it.
+- Fixed now:
+  - After a retryable final error (timeout/network), the session looks the payment up by idempotency key (retried under the policy) before deciding. If found: Success / Pending. If the gateway says it doesn't know the payment: Failed. If the gateway is unreachable: new outcome `CheckoutResult.Unresolved`, with the state left in `Processing` and nothing replayed, so the host must reconcile with `checkStatus()` [`timedOutButCapturedAtTheGateway_isReportedAsSuccess`, `gatewayUnreachableForTheLookupToo_isUnresolved_notFailed`, `checkStatusWhileProcessing_andTheGatewayNeverSawTheCharge_failsWithTimeout`, stress `latencySpikeSweep_findTheBreakingPoint` now asserts 0 "failed but captured" at every spike rate].
+  - Every captured, pending, confirmed and refunded amount and id is checked against the request; mismatches become `Failed(ResponseMismatch)` and never `Success` [`capturedAmountDifferentFromRequest_failsAsResponseMismatch`, `pendingAmountDifferentFromRequest_…`, `spoofedConfirmationForAnotherTransaction_…`, `refundForADifferentAmount_isAResponseMismatch`, `tamperedAmount_isNeverReportedAsSuccess`].
+  - Malformed ids fail safely [`malformedTransactionIds_failSafelyInsteadOfCrashing`].
+  - Refunds: single-flight per session (mutex) plus a derived refund idempotency key, so concurrent taps refund once. Only `Success` can be refunded, and a failed refund leaves the session `Success` [`concurrentRefunds_refundOnce`, `refund_beforeSuccess_isRejected`, `failedRefund_keepsTheSessionPaid`].
+  - `cancel()` works only before submission (atomic precondition check), so a pending, possibly paid order can't be hidden [`cancelWhilePending_isRefused_soAPossiblyPaidOrderIsNeverHidden`]. Payer cancellation comes only from the gateway's status answer.
+  - Status-query failures never fail a payment; only a definite gateway answer does [`statusCallErrors_duringPolling_areTolerated`].
+- Scope for improvement:
+  - `Unresolved` puts the final reconciliation on the host. A production backend would also receive gateway webhooks.
+  - Only full refunds are supported. Partial refunds need amount tracking per refund.
+  - `FakeGateway` is a sandbox only. A real gateway adapter must also enforce TLS pinning and request signing on its side.

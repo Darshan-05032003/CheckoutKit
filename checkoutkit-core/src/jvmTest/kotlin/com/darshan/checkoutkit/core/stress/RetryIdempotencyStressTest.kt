@@ -37,7 +37,7 @@ class RetryIdempotencyStressTest {
     private class CountingGateway(
         private val latencyMs: Long,
         private val behaviour: (ChargeRequest, Int) -> GatewayResult? = { _, _ -> null },
-    ) : PaymentGateway {
+    ) : ChargeOnlyGateway() {
         val calls = AtomicInteger()
         val charges = ConcurrentHashMap<IdempotencyKey, GatewayResult>()
         val callsPerKey = ConcurrentHashMap<IdempotencyKey, AtomicInteger>()
@@ -116,7 +116,7 @@ class RetryIdempotencyStressTest {
     fun slowGatewayHangs_perAttemptTimeoutBoundsEverySession() {
         val sessions = 2_000
         val callsPerKey = ConcurrentHashMap<IdempotencyKey, AtomicInteger>()
-        val hanging = object : PaymentGateway {
+        val hanging = object : ChargeOnlyGateway() {
             override suspend fun charge(request: ChargeRequest): GatewayResult {
                 val n = callsPerKey.computeIfAbsent(request.idempotencyKey) { AtomicInteger() }.incrementAndGet()
                 if (n == 1) delay(10_000) // first attempt hangs far beyond the timeout

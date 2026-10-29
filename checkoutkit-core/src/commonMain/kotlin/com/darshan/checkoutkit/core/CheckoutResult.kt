@@ -19,6 +19,14 @@ public sealed interface CheckoutResult {
     /** The payment was captured and later refunded. */
     public data class Refunded(val transactionId: String, val refundId: String) : CheckoutResult
 
+    /**
+     * The outcome is unknown: every attempt timed out or failed on the network **and** the gateway
+     * could not be reached to look the payment up. Money may or may not have been taken, so the
+     * payer must not be told it failed. Call [CheckoutSession.checkStatus] (or [CheckoutSession.submit]
+     * again, which reuses the idempotency key) to resolve it.
+     */
+    public data class Unresolved(val lastError: CheckoutError) : CheckoutResult
+
     /** Nothing was sent to the gateway because the request was invalid. */
     public data class Rejected(val error: CheckoutError) : CheckoutResult
 }

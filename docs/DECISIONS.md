@@ -34,5 +34,14 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Code table** covers common NPCI UPI codes (Z9, ZM, Z8, ZA, ZH, U69, …), ISO 8583 card codes (05, 51, 54, 14, 55, 61, 91, 96) and HTTP statuses. Unknown codes are *permanent* gateway errors (fail closed, no retry storm).
 - **`GatewayException(error)`** lets gateway adapters throw typed errors from deep inside networking code.
 
+## Feature 4: gateway, FakeGateway, polling, refunds
+- **`PaymentGateway` has three suspend calls** (charge, status, refund) and a written contract: idempotent per key, typed errors, truthful amounts, cancellable. `status` and `refund` are abstract (no defaults) because a gateway without them can't resolve pending payments or refund safely.
+- **Pending payments are polled** under `PendingPolicy` (2 s → 10 s, x1.5, 20 polls). When polling is exhausted the session stays `Pending` and `checkStatus()` resolves it later. A failed *status query* never fails the payment.
+- **Reconcile before failing** (added after the load test): unknown outcomes are looked up by key; if the gateway can't be reached the result is the new `CheckoutResult.Unresolved` rather than `Failed`.
+- **Every gateway answer is verified** against the request (amount, transaction id, id format) → `ResponseMismatch`.
+- **`cancel()` only from `Created`** (atomic `applyIf`); payer cancellation reaches `Cancelled` only through the gateway's status answer.
+- **Full refunds only**, single-flight per session, refund key = `<key>-rf`. A failed refund leaves the session `Success`.
+- **FakeGateway lives in `commonMain`** (shipped in the SDK) so hosts can use it in their own tests and demos, the way Stripe ships test cards. It simulates latency split into request and response legs (spikes on the response leg, i.e. "captured but the answer is late"), server-side idempotency, pending resolution, refunds, NPCI-style failures and magic test inputs.
+
 ## Compromises
 _None yet._

@@ -64,3 +64,34 @@ excluded from `allTests`.
   3. Under a polling storm this multiplies garbage and GC pauses on the UI process.
 - Fix applied / recommendation:
   - Codes longer than 64 chars are now rejected before any copy (constant time). Gateways should also cap response body sizes at the HTTP layer.
+
+## Feature: Pluggable gateway + FakeGateway
+- Scenario and scale:
+  - 10,000 concurrent sessions against `FakeGateway` (2 to 5 ms latency, 5 % of calls spiking to 300 ms, the first attempt of every key failing with a network error), mixed payers via magic inputs (50 % ok, the rest declined / insufficient funds / invalid VPA), 100 ms attempt timeout, 4 attempts with full jitter.
+  - Pending polling storm: 5,000 UPI-collect-style payments, each pending for 3 polls (10 → 40 ms backoff).
+  - Latency-spike sweep to find the breaking point: 2,000 sessions per run, 8 s response spikes vs a 3 s attempt timeout, spike probability 0 % → 90 % (virtual time).
+- Results (numbers):
+  - 10k mixed: 568 to 617 ms wall time, 70 to 115 MB transient heap, 20,505 charge calls; exactly 5,000 successes = 5,000 captures (no double capture, one capture per key).
+  - Polling storm: 863 to 1,045 ms; exactly 20,000 status calls (4.0 per payment, as configured); all 5,000 resolved to Success.
+  - Spike sweep after the fix (success / unresolved / failed-but-captured):
+
+    | Spike rate | Success | Unresolved | Failed but captured | Charge calls | Status calls |
+    |---|---|---|---|---|---|
+    | 0 % | 2,000 | 0 | 0 | 2,000 | 0 |
+    | 10 % | 2,000 | 0 | 0 | 2,186 | 2 |
+    | 30 % | 1,998 | 2 | 0 | 2,734 | 79 |
+    | 50 % | 1,968 | 32 | 0 | 3,532 | 444 |
+    | 70 % | 1,747 | 253 | 0 | 4,368 | 1,516 |
+    | 90 % | 948 | 1,052 | 0 | 5,418 | 3,968 |
+  - Before the fix, the same sweep reported Timeout failures for payments that were captured: 2 at 10 % spikes, 20 at 30 %, and at 90 % 74 % of the (all captured) payments were reported as failed.
+- What broke:
+  - **Correctness under latency spikes.** When the gateway captured the money but the response arrived after the attempt timeout, the SDK retried, timed out again and declared the payment failed.
+- Failure flow (step by step):
+  1. The payer taps Pay. The charge request reaches the gateway, which captures ₹ and sends the answer.
+  2. The answer is delayed (8 s spike) past the 3 s attempt timeout; the SDK cancels the attempt.
+  3. The retries hit the same slow response leg and time out too.
+  4. Old behaviour: `Failed(Timeout)` → "Payment failed". The payer pays again → double charge.
+- Fix applied / recommendation:
+  - Reconcile before failing: look the payment up by idempotency key (retried under the same policy). Then report Success / Pending if found, Failed if unknown to the gateway, and `Unresolved` (state kept `Processing`, never cached) if the gateway is unreachable.
+  - Breaking point: success stays at 98 % or more up to 50 % spikes. Beyond about 70 % the gateway is effectively down and `Unresolved` grows, but the outcome is never wrongly reported as failed.
+  - Recommendation for hosts: show `Unresolved` as "We're confirming your payment, don't pay again" and call `checkStatus()` later.

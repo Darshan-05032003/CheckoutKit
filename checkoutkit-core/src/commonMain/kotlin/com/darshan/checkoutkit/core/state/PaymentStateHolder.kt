@@ -39,9 +39,15 @@ public class PaymentStateHolder(
     public val history: List<StateTransition> get() = _snapshot.value.history
 
     /** Applies [event] atomically. A rejected event changes nothing. */
-    public fun apply(event: PaymentEvent): TransitionResult {
+    public fun apply(event: PaymentEvent): TransitionResult = applyIf(event) { true }
+
+    /** Applies [event] only if the current state satisfies [precondition], atomically. */
+    internal fun applyIf(event: PaymentEvent, precondition: (PaymentState) -> Boolean): TransitionResult {
         while (true) {
             val current = _snapshot.value
+            if (!precondition(current.state)) {
+                return TransitionResult.Rejected(current.state, event, "precondition failed in ${current.state.name}")
+            }
             val result = PaymentStateMachine.transition(current.state, event)
             if (result !is TransitionResult.Accepted) return result
             val record = StateTransition(result.from, result.to, event, clock.nowMillis())

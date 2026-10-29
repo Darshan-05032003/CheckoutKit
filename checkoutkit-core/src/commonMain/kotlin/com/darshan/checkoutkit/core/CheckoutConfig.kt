@@ -12,7 +12,8 @@ import kotlin.time.Duration.Companion.hours
  * SDK configuration. Every dependency on time, threads and randomness is injectable so that hosts
  * can test their checkout deterministically.
  *
- * @property retryPolicy retry, backoff and timeout rules for charge calls.
+ * @property retryPolicy retry, backoff and timeout rules for charge and refund calls.
+ * @property pendingPolicy how pending payments are polled.
  * @property dispatcher where payment work runs.
  * @property clock wall-clock source.
  * @property random randomness for backoff jitter.
@@ -21,6 +22,7 @@ import kotlin.time.Duration.Companion.hours
  */
 public data class CheckoutConfig(
     val retryPolicy: RetryPolicy = RetryPolicy.Default,
+    val pendingPolicy: PendingPolicy = PendingPolicy(),
     val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     val clock: CheckoutClock = CheckoutClock.System,
     val random: Random = Random.Default,
