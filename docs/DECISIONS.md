@@ -10,5 +10,13 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **compileSdk / targetSdk 37** (latest stable platform installed), **minSdk 26**.
 - Robolectric tests pin `@Config(sdk = [35])` because Robolectric 4.17 doesn't ship an SDK 37 runtime yet.
 
+## Feature 1: state machine
+- **Pure transition function + CAS holder.** `PaymentStateMachine.transition` is a stateless function; `PaymentStateHolder` publishes state with `MutableStateFlow.compareAndSet`. This works in common code without locks or atomicfu and gives "exactly one winner" under races.
+- **Cancel is legal only from Created and Pending.** Cancelling while the charge request is in flight (Processing) would hide a payment that may already be captured; instead the outcome is reconciled through the gateway status check.
+- **Success is not terminal** because it can move to Refunded; `isOutcome` tells hosts the money outcome is final.
+- **`CheckoutError` starts small** (Network, Timeout, Declined, Unknown) because `Failed` needs an error type; feature 3 completes it.
+- **History is capped at 32 entries** after the load test showed quadratic copying under retry storms.
+- **Stress tests** live in `jvmTest` package `...core.stress`, are filtered out of `jvmTest`, and run via a dedicated `stressTest` Test task with a 1 GB heap.
+
 ## Compromises
 _None yet._
