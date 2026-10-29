@@ -18,5 +18,14 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **History is capped at 32 entries** after the load test showed quadratic copying under retry storms.
 - **Stress tests** live in `jvmTest` package `...core.stress`, are filtered out of `jvmTest`, and run via a dedicated `stressTest` Test task with a 1 GB heap.
 
+## Feature 2: retry, timeout, idempotency
+- **Jitter model:** delay = `base * (1 - jitterFactor * U[0,1))`, so `jitterFactor = 1.0` is AWS-style "full jitter" and `0.0` is plain exponential. Default 0.5 keeps retries reasonably quick for one user; full jitter is recommended for fleets.
+- **`maxAttempts` hard cap of 10**, and all timeouts must be finite, so a misconfiguration can't create unbounded retry storms.
+- **Exceptions:** `IOException` → `Network`, `SocketTimeoutException` → `Timeout` (via `expect/actual` for jvm and android), everything else → `Unknown(className)`. Messages are dropped because they can contain card data.
+- **What is replayed:** Success, Refunded and non-retryable failures are cached per key. Pending, cancelled, rejected and transient failures are not, so a "Try again" with the same key re-executes (the gateway dedupes by key). Concurrent duplicates always share the in-flight result.
+- **Owner cancellation:** if the coroutine running the charge is cancelled, a waiting duplicate takes over with the same key; the session stays `Processing` until the outcome is known.
+- **Key reuse with a different request** is rejected (fingerprint check), following Stripe's idempotency semantics.
+- **Minimal `PaymentGateway` (charge only) in feature 2** so the session could be built and tested end to end; status and refund come in feature 4.
+
 ## Compromises
 _None yet._

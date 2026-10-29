@@ -23,4 +23,7 @@ public sealed class CheckoutError(
 
     /** An error the SDK could not classify. [detail] is for developers only, never shown to users. */
     public data class Unknown(val detail: String? = null) : CheckoutError("UNKNOWN", retryable = false)
+
+    /** The SDK was called with input it can't accept (bad amount, reused idempotency key, wrong state). */
+    public data class InvalidRequest(val detail: String) : CheckoutError("INVALID_REQUEST", retryable = false)
 }

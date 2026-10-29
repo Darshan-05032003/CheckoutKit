@@ -24,3 +24,34 @@ name is given in brackets.
 - Scope for improvement:
   - The holder lives in memory. A host that must survive process death mid-payment should persist the idempotency key and reconcile through the gateway status check (added in features 2 and 4).
   - History timestamps could also store a monotonic clock reading to make clock-change forensics easier.
+
+## Feature: Retry/timeout handling and idempotency
+- Attacks tried:
+  - Idempotency replay: reuse a captured key with a different amount (₹499 → ₹1) or a different payment method.
+  - Double spend: 50 to 1,000 concurrent submits of one checkout (double taps, retry button mashing), and 1,000 sessions restored with the same key.
+  - Malformed keys: empty, 65+ chars, spaces, SQL (`;DROP TABLE`), newline, Cyrillic look-alikes, RTL override `U+202E`, path traversal.
+  - Predictable keys (guess another checkout's key).
+  - Retry storm by misconfiguration: `maxAttempts = 11+`, infinite total timeout, NaN multiplier, negative delays.
+  - Cancellation masking: a gateway that throws `CancellationException` or its own `withTimeout`; the caller cancelled during a backoff delay.
+  - PII leakage: gateway exceptions whose messages contain card numbers.
+  - Process death mid-payment (coroutine cancelled while the charge is in flight).
+  - Memory exhaustion of the idempotency store; clock moved forward/back.
+  - Zero, negative, `Long.MAX_VALUE` amounts; hostile order ids (`javascript:`, RTL, `../`).
+- What broke:
+  - Design-time finding (High): without a request fingerprint, a stolen or reused key could replay a cached success for a different amount, so the host would show "paid" for an order that was never charged at that amount. Built in from the start: the fingerprint check below.
+  - Coroutine pitfall (Medium): a `TimeoutCancellationException` thrown by the gateway's own `withTimeout` looks like a cancellation and would escape as one, aborting the checkout silently. Found while writing the executor tests and fixed before commit.
+  - Clock changes (Low): the store's TTL uses wall-clock time, so moving the clock forward shortens the replay window. Gateway-side dedup on the same key still prevents double charges.
+- Fixed now:
+  - Every key has a request fingerprint (order, amount, currency, method; no PAN/CVV). Reusing a key for a different request returns `Rejected(InvalidRequest)` and never charges [`sameKeyReusedWithADifferentAmount_isRejected`, `sameKeyWithDifferentRequest_isAConflict`, `…whileInFlight_isAConflict`].
+  - Single-flight per key: exactly 1 charge for 1,000 concurrent submits [`doubleTap_concurrentSubmits_chargeOnce`, `concurrentDuplicates_shareOneExecution`, stress `sameIdempotencyKeyFired1000TimesConcurrently_*`].
+  - Keys must match `[A-Za-z0-9_-]{8,64}`; generated keys are UUID v4 from a secure random source [`malformedKeys_areRejected`, `generatedKeys_areUniqueAndWellFormed`].
+  - `maxAttempts` capped at 10; timeouts must be finite; multiplier ≥ 1 and finite [`invalidPolicies_areRejected`].
+  - `CancellationException` is always rethrown; the gateway's own timeouts become `Timeout` only while the caller is still active [`cancellationExceptionThrownByTheBlock_isRethrown`, `gatewaysOwnWithTimeout_isATimeoutError_notACancellationOfTheCaller`, `cancellationDuringBackoff_stopsFurtherAttempts`].
+  - Unknown exceptions keep only the class name, never the message [`unknownExceptions_keepOnlyTheClassName_neverTheMessage`].
+  - An interrupted submit leaves the session in `Processing`; resubmitting resumes with the same key [`interruptedSubmit_staysProcessing_andResubmitResumesWithTheSameKey`].
+  - The store has a TTL (24 h) and a size bound (1,000), oldest evicted first [`entriesExpireAfterTtl`, `oldestEntriesAreEvictedBeyondMaxEntries`].
+  - Amount must be 1..₹1 crore in paise; order ids `[A-Za-z0-9._-]{1,64}`; descriptions ≤ 140 chars, no control chars [`CheckoutRequestTest`].
+  - `PaymentMethod.Card.toString()` masks PAN and CVV [`card_toString_neverLeaksPanOrCvv`].
+- Scope for improvement:
+  - The store is in memory. A host that needs exactly-once across process death should persist the key before submitting (PayFlow does this in Room) and rely on gateway-side dedup.
+  - Card fingerprints use last4 + expiry. Two cards sharing both would not be told apart for conflict detection (they are still charged correctly).
