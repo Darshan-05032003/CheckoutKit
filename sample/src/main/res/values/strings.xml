@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">CheckoutKit Sample</string>
+    <string name="sample_title">CheckoutKit %1$s</string>
+</resources>

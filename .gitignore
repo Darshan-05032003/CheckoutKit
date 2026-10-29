@@ -1,0 +1,25 @@
+# Secrets / local config
+local.properties
+*.jks
+*.keystore
+google-services.json
+
+# Private agent notes (never pushed)
+CLAUDE.md
+CLAUDE.local.md
+.ai-notes/
+.claude/
+
+# Gradle / build
+.gradle/
+build/
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
