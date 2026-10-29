@@ -55,3 +55,23 @@ name is given in brackets.
 - Scope for improvement:
   - The store is in memory. A host that needs exactly-once across process death should persist the key before submitting (PayFlow does this in Room) and rely on gateway-side dedup.
   - Card fingerprints use last4 + expiry. Two cards sharing both would not be told apart for conflict detection (they are still charged correctly).
+
+## Feature: Typed error codes
+- Attacks tried:
+  - Hostile gateway codes: `<script>`, embedded newlines (log injection), 10,000-char strings, RTL override, Devanagari and other non-ASCII look-alikes, 100,000 random strings of up to 4 KB.
+  - Information leakage: errors carrying stack-trace class names, file paths, tokens or raw gateway codes, checked against what the payer would see.
+  - Wrong-PIN loops: would a retryable mapping resend a UPI PIN automatically?
+  - Hostile `Retry-After`: `Long.MAX_VALUE` or negative values to stall or break the retry loop.
+  - Misclassification: a permanent failure (401, unknown code) marked transient would trigger retry storms.
+- What broke:
+  - A huge hostile code was trimmed and upper-cased (copied) before validation, an avoidable allocation per response (Low). Fixed: codes over 64 chars are dropped before any copy.
+  - Nothing else broke. Design-time choices are recorded below.
+- Fixed now:
+  - Raw codes must be a short `[A-Z0-9_]{1,24}` token or they are dropped (`gatewayCode = null`) [`hostileCodes_areSanitisedBeforeTheyReachLogs`, stress `hundredThousandHostileCodes_neverLeakIntoTheError`].
+  - User messages are fixed strings per error type; no detail, code or exception text is ever interpolated [`messagesNeverEchoInternalDetailsOrGatewayCodes`, `unknownGatewayCode_failsPermanently_withoutLeakingItToThePayer`].
+  - `AuthenticationFailed` (wrong PIN/OTP), declines, limits and invalid details are non-retryable, so credentials are never resent automatically [`wrongUpiPin_isNotRetried_soThePinIsNeverResentAutomatically`, `retryability_matchesWhetherTryingAgainCanHelp`].
+  - `Retry-After` is honoured but capped at the policy's total timeout; negative values are rejected [`hostileRetryAfter_isBoundedByTheTotalTimeout`, `rateLimited_rejectsNegativeRetryAfter`].
+  - Unknown codes and HTTP 401/403 are permanent `GatewayError`s, so a misconfigured merchant key can't cause a retry storm [`unknownCodes_becomePermanentGatewayErrors`, `httpStatuses_mapWhenThereIsNoCode`].
+- Scope for improvement:
+  - The code table covers the common NPCI and ISO 8583 codes, not every bank-specific code. Unrecognised ones fail safely as permanent gateway errors.
+  - The built-in English messages are generic. The Android UI maps errors to `strings.xml` (feature 5), so they can be translated.

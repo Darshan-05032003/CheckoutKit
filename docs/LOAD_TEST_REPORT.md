@@ -48,3 +48,19 @@ excluded from `allTests`.
 - Fix applied / recommendation:
   - The bound stays, for memory safety (≈3.4 MB at the default). It is configurable through `CheckoutConfig.maxIdempotencyEntries`, and the gateway dedup contract is documented on `PaymentGateway`.
   - Production hosts should use full jitter (`jitterFactor = 1.0`) when many clients can fail together (for example after a gateway outage). The default is 0.5.
+
+## Feature: Typed error codes
+- Scenario and scale:
+  - 1,000,000 gateway-code → `CheckoutError` → `UserMessage` mappings on 8 coroutines (`Dispatchers.Default`), mixing UPI, ISO and unknown codes.
+  - 100,000 random hostile codes (1 % of them up to 4 KB) built from markup, control, RTL, Devanagari, emoji and ASCII characters.
+- Results (numbers):
+  - 1M mappings: 54 ms, about 18.5 million mappings per second, 23 MB transient heap. Mapping can't be a bottleneck.
+  - 100k hostile codes: 144 ms, 94,717 dropped as unsafe; every code that was kept matched `[A-Z0-9_]{1,24}`.
+- What broke:
+  - Nothing functionally. Profiling the hostile run showed every long code being copied twice (`trim` + `uppercase`) before it was rejected.
+- Failure flow (step by step):
+  1. A compromised or buggy gateway answers with a multi-megabyte "code".
+  2. `fromCode` trims and upper-cases it, which allocates two more copies.
+  3. Under a polling storm this multiplies garbage and GC pauses on the UI process.
+- Fix applied / recommendation:
+  - Codes longer than 64 chars are now rejected before any copy (constant time). Gateways should also cap response body sizes at the HTTP layer.

@@ -27,5 +27,12 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Key reuse with a different request** is rejected (fingerprint check), following Stripe's idempotency semantics.
 - **Minimal `PaymentGateway` (charge only) in feature 2** so the session could be built and tested end to end; status and refund come in feature 4.
 
+## Feature 3: typed errors
+- **Sealed class with 14 cases**, each with a stable `code` and `retryable` flag; payload-free cases are `data object`s so they compare by identity and print nicely.
+- **Two layers of messages:** core ships English `toUserMessage()` plus a `CheckoutMessages` hook for hosts; the Android UI maps errors to string resources for localisation. Messages never interpolate gateway data.
+- **`RecoveryAction`** (retry / change method / edit details / contact support) lets the sheet choose the right button without string matching.
+- **Code table** covers common NPCI UPI codes (Z9, ZM, Z8, ZA, ZH, U69, …), ISO 8583 card codes (05, 51, 54, 14, 55, 61, 91, 96) and HTTP statuses. Unknown codes are *permanent* gateway errors (fail closed, no retry storm).
+- **`GatewayException(error)`** lets gateway adapters throw typed errors from deep inside networking code.
+
 ## Compromises
 _None yet._

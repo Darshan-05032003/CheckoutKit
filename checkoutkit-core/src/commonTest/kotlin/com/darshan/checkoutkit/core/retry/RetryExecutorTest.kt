@@ -157,6 +157,32 @@ class RetryExecutorTest {
     }
 
     @Test
+    fun rateLimited_waitsAtLeastTheServersRetryAfter() = runTest {
+        val startedAt = mutableListOf<Long>()
+        val outcome = executor().execute { attempt ->
+            startedAt += currentTime
+            if (attempt == 1) AttemptResult.Failure(CheckoutError.RateLimited(retryAfterMillis = 5_000)) else AttemptResult.Success(attempt)
+        }
+        assertEquals(RetryOutcome.Success(2, attempts = 2), outcome)
+        assertEquals(listOf(0L, 5_000L), startedAt)
+    }
+
+    @Test
+    fun hostileRetryAfter_isBoundedByTheTotalTimeout() = runTest {
+        val outcome = executor(noJitter.copy(totalTimeout = 10.seconds)).execute<Unit> {
+            AttemptResult.Failure(CheckoutError.RateLimited(retryAfterMillis = Long.MAX_VALUE))
+        }
+        assertEquals(RetryOutcome.Failure(CheckoutError.Timeout, attempts = 1), outcome)
+        assertEquals(10_000L, currentTime)
+    }
+
+    @Test
+    fun gatewayException_isUnwrappedToItsTypedError() = runTest {
+        val outcome = executor().execute<Unit> { throw com.darshan.checkoutkit.core.error.GatewayException(CheckoutError.InsufficientFunds) }
+        assertEquals(RetryOutcome.Failure(CheckoutError.InsufficientFunds, attempts = 1), outcome)
+    }
+
+    @Test
     fun unexpectedException_becomesUnknownAndIsNotRetried() = runTest {
         var calls = 0
         val outcome = executor().execute<Unit> { calls++; error("boom") }

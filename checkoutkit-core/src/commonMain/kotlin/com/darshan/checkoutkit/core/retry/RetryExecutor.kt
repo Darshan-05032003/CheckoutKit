@@ -1,6 +1,7 @@
 package com.darshan.checkoutkit.core.retry
 
 import com.darshan.checkoutkit.core.error.CheckoutError
+import com.darshan.checkoutkit.core.error.GatewayException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -9,6 +10,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /** What one attempt produced. */
 public sealed interface AttemptResult<out T> {
@@ -67,7 +69,7 @@ public class RetryExecutor(
                         if (!result.error.retryable || attempt >= policy.maxAttempts) {
                             return@withTimeoutOrNull RetryOutcome.Failure(result.error, attempt)
                         }
-                        val wait = policy.backoffDelay(retryNumber = attempt, random = random)
+                        val wait = waitBefore(retryNumber = attempt, cause = result.error)
                         onRetry(attempt + 1, wait, result.error)
                         delay(wait)
                     }
@@ -77,6 +79,14 @@ public class RetryExecutor(
             error("unreachable")
         }
         return outcome ?: RetryOutcome.Failure(if (lastError.retryable) CheckoutError.Timeout else lastError, attempt)
+    }
+
+    /** Backoff delay, but never shorter than a rate-limit `Retry-After` hint (bounded by the total timeout). */
+    private fun waitBefore(retryNumber: Int, cause: CheckoutError): Duration {
+        val backoff = policy.backoffDelay(retryNumber, random)
+        val hintMs = (cause as? CheckoutError.RateLimited)?.retryAfterMillis ?: return backoff
+        val hint = hintMs.coerceAtMost(policy.totalTimeout.inWholeMilliseconds).milliseconds
+        return maxOf(backoff, hint)
     }
 
     private suspend fun <T> runAttempt(attempt: Int, block: suspend (Int) -> AttemptResult<T>): AttemptResult<T> =
@@ -89,6 +99,8 @@ public class RetryExecutor(
             AttemptResult.Failure(CheckoutError.Timeout)
         } catch (e: CancellationException) {
             throw e
+        } catch (e: GatewayException) {
+            AttemptResult.Failure(e.error)
         } catch (t: Throwable) {
             AttemptResult.Failure(classifyThrowable(t))
         }
