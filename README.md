@@ -118,6 +118,15 @@ dependencies {
 }
 ```
 
+These coordinates were verified on JitPack (build log: `BUILD SUCCESSFUL`, artifacts
+`checkoutkit-core`, `checkoutkit-core-android`, `checkoutkit-core-jvm`, `checkoutkit-ui`) by building a
+fresh Android app that resolves `checkoutkit-ui:v1.0.0 → checkoutkit-core:v1.0.0 → checkoutkit-core-android:v1.0.0`.
+
+> **Don't use JitPack's aggregate coordinate** `com.github.Darshan-05032003:CheckoutKit:v1.0.0` in an
+> Android app. It pulls every module, including the JVM variant of the core, and the build fails
+> with "Duplicate class com.darshan.checkoutkit.core…". If you must use it, add
+> `exclude(group = "com.github.Darshan-05032003.CheckoutKit", module = "checkoutkit-core-jvm")`.
+
 ## Quick start
 
 ```kotlin

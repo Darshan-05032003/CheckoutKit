@@ -131,3 +131,21 @@ excluded from `allTests`.
   3. Reconciliation asks the gateway by key, learns it never saw the charge, and the sheet shows "This is taking too long".
 - Fix applied / recommendation:
   - Kept as is in the sample: it demonstrates the retry policy. Hosts that prefer a faster answer should lower `attemptTimeout`/`maxAttempts`. Reconciliation keeps that safe, because a shorter timeout can no longer produce a wrong "failed".
+
+## Feature: JitPack publishing and API lock
+- Scenario and scale:
+  - The real distribution path: JitPack builds tag `v1.0.0` from source, then a fresh Android app (AGP 9.5, compileSdk 37, outside this repo) resolves and builds against the published artifacts with `--refresh-dependencies`.
+  - Both coordinate styles were tried: per-module (`com.github.Darshan-05032003.CheckoutKit:checkoutkit-ui:v1.0.0`) and JitPack's aggregate (`com.github.Darshan-05032003:CheckoutKit:v1.0.0`).
+- Results (numbers):
+  - JitPack build: `BUILD SUCCESSFUL in 1m 33s`, exit code 0, 4 artifacts found (core, core-android, core-jvm, ui), with JDK 17.0.12 and Android platform 37 on JitPack's builder (first attempt; no re-tag needed).
+  - Artifact sizes served: `checkoutkit-core-android` AAR 282 KB, `checkoutkit-ui` AAR 120 KB.
+  - Consumer app, cold resolution from jitpack.io plus a debug build: 78 s, debug APK 11.8 MB. The dependency tree is `checkoutkit-ui:v1.0.0 → checkoutkit-core:v1.0.0 → checkoutkit-core-android:v1.0.0`.
+  - Sample release APK (R8, shrink, SDK consumer rules): 1.37 MB unsigned.
+- What broke:
+  - The aggregate coordinate fails to build an Android app: "Duplicate class com.darshan.checkoutkit.core.CheckoutConfig" (and every other core class), because JitPack's aggregate POM lists both `checkoutkit-core-android` and `checkoutkit-core-jvm`.
+- Failure flow (step by step):
+  1. A host copies the generic JitPack snippet `com.github.<user>:<repo>:<tag>`.
+  2. Gradle resolves the aggregate POM, which depends on all four modules.
+  3. Both the Android AAR and the JVM JAR of the core land on the Android classpath, and AGP's duplicate-class check fails.
+- Fix applied / recommendation:
+  - The README documents only the per-module coordinates (verified), warns against the aggregate, and gives the exclusion workaround (`exclude(module = "checkoutkit-core-jvm")`), also verified to build.
