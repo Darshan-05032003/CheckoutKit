@@ -228,7 +228,7 @@ then pay through the real sheet and see the result.
 
 | Suite | Count |
 |---|---|
-| Unit (core commonTest + jvmTest, UI view model/transformations, sample) | 210 |
+| Unit (core commonTest + jvmTest, UI view model/transformations, sample) | 211 |
 | Integration (core `integration` package; Robolectric Compose flows for sheet and sample) | 45 |
 | Stress (`stress` packages, `./gradlew stressTest`) | 19 |
 
