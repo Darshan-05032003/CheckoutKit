@@ -129,3 +129,25 @@ name is given in brackets.
   - The card number field still allows copy (useful for the payer). A stricter mode could disable it.
   - `FLAG_SECURE` covers only the sheet window. Hosts should also secure their own payment screens (PayFlow does).
   - Card details reach the gateway in memory as `PaymentMethod.Card`. A production SDK would tokenise them in a PCI-compliant iframe/SDK and never touch the PAN.
+
+## Feature: Sample app and docs
+- Attacks tried:
+  - Exported components and intent spoofing: which components are exported and what an external intent could trigger.
+  - Backups and device transfer: whether app data (results, keys) can be pulled with `adb backup` or a device-to-device transfer.
+  - Cleartext traffic and permissions: whether the sample can talk to the network at all.
+  - Release logging and reverse engineering: R8 configuration, log stripping, consumer rules shipped by the libraries.
+  - Double refunds from the sample's Refund button (rapid taps), and refunding a payment the gateway doesn't know.
+  - Secrets in the APK: keys, tokens or endpoints in BuildConfig/resources.
+- What broke:
+  - Nothing exploitable. Lint flagged that `allowBackup="false"` alone no longer covers Android 12+ device transfer (Low, `DataExtractionRules`). Fixed.
+  - The sample initially had no launcher icon (lint `MissingApplicationIcon`, cosmetic). Fixed.
+- Fixed now:
+  - `data_extraction_rules.xml` excludes every domain from cloud backup and device transfer; `allowBackup="false"`, `fullBackupContent="false"`.
+  - `usesCleartextTraffic="false"`. There is no `INTERNET` permission: the sample only uses the in-memory `FakeGateway`.
+  - Only the launcher activity is exported (required for `MAIN/LAUNCHER`), and it accepts no data or extras.
+  - Release: R8 minify plus resource shrinking. `-assumenosideeffects` strips `android.util.Log` calls (the SDK itself never logs). Consumer rules ship with both libraries and were verified in R8's `configuration.txt`.
+  - Refunds are idempotent per refund key (one key per result), so rapid taps refund once [`KitRefundTest.concurrentRefundsWithOneKey_refundOnce`]. Unknown transactions return a typed error [`refundOfAPaymentTheGatewayDoesNotKnow_showsAnError`]. A refund key reused for another transaction is rejected [`sameRefundKeyForADifferentTransaction_isRejected`].
+  - No secrets exist anywhere (the sandbox needs none). Pre-push checks run `git grep` for key patterns and for private files.
+- Scope for improvement:
+  - In a real app, refunds belong on the merchant's backend, not in the client. `CheckoutKit.refund` exists for demos and back-office tools.
+  - The sample's last result lives in memory (only the selected outcome survives process death). A real host should persist orders and their idempotency keys (PayFlow uses Room).

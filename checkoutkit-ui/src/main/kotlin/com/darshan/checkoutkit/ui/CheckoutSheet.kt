@@ -155,19 +155,33 @@ public fun CheckoutSheet(state: CheckoutSheetState, modifier: Modifier = Modifie
  * (`composeRule.onNodeWithTag(CheckoutSheetTestTags.PAY_BUTTON).performClick()`).
  */
 public object CheckoutSheetTestTags {
+    /** The bottom sheet container. */
     public const val SHEET: String = "checkoutkit_sheet"
+    /** UPI ID text field. */
     public const val VPA_FIELD: String = "checkoutkit_vpa"
+    /** Card number text field. */
     public const val CARD_NUMBER_FIELD: String = "checkoutkit_card_number"
+    /** Card expiry text field (digits, shown as MM/YY). */
     public const val EXPIRY_FIELD: String = "checkoutkit_expiry"
+    /** CVV text field (masked). */
     public const val CVV_FIELD: String = "checkoutkit_cvv"
+    /** The Pay button. */
     public const val PAY_BUTTON: String = "checkoutkit_pay"
+    /** Processing screen (payment in flight). */
     public const val PROCESSING: String = "checkoutkit_processing"
+    /** Pending screen (waiting for the payer or bank). */
     public const val PENDING: String = "checkoutkit_pending"
+    /** Success screen. */
     public const val SUCCESS: String = "checkoutkit_success"
+    /** Failure screen. */
     public const val FAILED: String = "checkoutkit_failed"
+    /** Unresolved screen (outcome could not be confirmed). */
     public const val UNRESOLVED: String = "checkoutkit_unresolved"
+    /** Main button of an outcome screen (Done / Try again / Use another method). */
     public const val PRIMARY_ACTION: String = "checkoutkit_primary_action"
+    /** Check status button (pending and unresolved screens). */
     public const val CHECK_STATUS: String = "checkoutkit_check_status"
+    /** Cancel / Close button in the header. */
     public const val CLOSE_BUTTON: String = "checkoutkit_close"
 
     /** Tag of the tab for [option] (`"UPI"`, `"CARD"`, `"WALLET"`). */

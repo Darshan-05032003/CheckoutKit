@@ -114,3 +114,20 @@ excluded from `allTests`.
   - N/A. The pre-existing protections held: input caps → validators → `phase == Form` guard → idempotency store.
 - Fix applied / recommendation:
   - None needed. Keep the length caps in the view model if fields are added; they are what keeps a 100 KB paste cheap.
+
+## Feature: Sample app and docs
+- Scenario and scale:
+  - The sample's outcome matrix: all 11 `FakeOutcome`s x 100 concurrent checkouts each, with the sample's production timings (800 ms latency, 3 attempts, 3 s attempt timeout, 1.5 s pending polls), on virtual time. Every success is then refunded concurrently through `CheckoutKit.refund`.
+  - 1,000 sample-style sheets opened, paid and closed in a row (reported under feature 5).
+- Results (numbers):
+  - 1,100 checkouts + all refunds: 82 ms wall time (58.9 s of simulated time). Each outcome produced exactly its expected result type 100/100 times.
+  - Gateway calls per 100 checkouts: 100 for single-shot outcomes, 200 for `RATE_LIMITED_ONCE` (one 429, then success), 300 for `GATEWAY_ERROR` and `TIMEOUT` (3 attempts each), confirming `maxAttempts` holds under load.
+  - Refunds: one refund per captured payment, `refundedPayments == successes` for every outcome.
+- What broke:
+  - Nothing. One UX cost was measured: with the sample's timings the `TIMEOUT` outcome keeps a payer waiting about 3 x 3 s plus 1 to 3 s of backoff plus a status lookup, roughly 11 to 13 s, before the failure screen.
+- Failure flow (step by step):
+  1. The gateway never answers.
+  2. Each of 3 attempts waits the full 3 s attempt timeout, with jittered backoff in between.
+  3. Reconciliation asks the gateway by key, learns it never saw the charge, and the sheet shows "This is taking too long".
+- Fix applied / recommendation:
+  - Kept as is in the sample: it demonstrates the retry policy. Hosts that prefer a faster answer should lower `attemptTimeout`/`maxAttempts`. Reconciliation keeps that safe, because a shorter timeout can no longer produce a wrong "failed".

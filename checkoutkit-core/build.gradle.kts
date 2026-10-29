@@ -15,6 +15,10 @@ kotlin {
         compileSdk = 37
         minSdk = 26
         withHostTest {}
+        optimization {
+            consumerKeepRules.publish = true
+            consumerKeepRules.files.add(project.file("consumer-rules.pro"))
+        }
     }
 
     sourceSets {

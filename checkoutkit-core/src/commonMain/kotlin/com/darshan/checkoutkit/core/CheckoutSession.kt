@@ -5,7 +5,6 @@ import com.darshan.checkoutkit.core.gateway.ChargeRequest
 import com.darshan.checkoutkit.core.gateway.GatewayResult
 import com.darshan.checkoutkit.core.gateway.PaymentGateway
 import com.darshan.checkoutkit.core.gateway.RefundRequest
-import com.darshan.checkoutkit.core.gateway.RefundResult
 import com.darshan.checkoutkit.core.gateway.StatusQuery
 import com.darshan.checkoutkit.core.idempotency.IdempotencyConflictException
 import com.darshan.checkoutkit.core.idempotency.IdempotencyKey
@@ -40,7 +39,9 @@ import kotlin.coroutines.cancellation.CancellationException
  *   (the outcome is unknown); calling [submit] or [checkStatus] again resumes with the same key.
  */
 public class CheckoutSession internal constructor(
+    /** What is being paid for. */
     public val request: CheckoutRequest,
+    /** Identifies this attempt; sent with every charge, retry and status call. Persist it to resume. */
     public val idempotencyKey: IdempotencyKey,
     private val gateway: PaymentGateway,
     private val config: CheckoutConfig,
@@ -110,23 +111,12 @@ public class CheckoutSession internal constructor(
                 else -> return@withContext rejected("refund needs SUCCESS, state is ${current.name}")
             }
             val refundRequest = RefundRequest(refundKey, paid.transactionId, request.amountPaise)
-            val outcome = executor.execute {
-                when (val r = gateway.refund(refundRequest)) {
-                    is RefundResult.Refunded -> AttemptResult.Success(r)
-                    is RefundResult.Failed -> AttemptResult.Failure(r.error)
+            when (val result = executeRefund(gateway, executor, refundRequest)) {
+                is CheckoutResult.Refunded -> {
+                    holder.apply(PaymentEvent.Refund(result.refundId))
+                    resultOf(holder.state.value) ?: result
                 }
-            }
-            when (outcome) {
-                is RetryOutcome.Failure -> CheckoutResult.Failed(outcome.error)
-                is RetryOutcome.Success -> {
-                    val refunded = outcome.value
-                    if (refunded.amountPaise != request.amountPaise || !isValidId(refunded.refundId)) {
-                        CheckoutResult.Failed(CheckoutError.ResponseMismatch)
-                    } else {
-                        holder.apply(PaymentEvent.Refund(refunded.refundId))
-                        resultOf(holder.state.value) ?: CheckoutResult.Refunded(paid.transactionId, refunded.refundId)
-                    }
-                }
+                else -> result
             }
         }
     }

@@ -53,5 +53,12 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **`CheckoutSheetTestTags` is public** so host apps (PayFlow) can drive the sheet in their own UI tests.
 - **UI stress tests** run through a `stressTest` task in `checkoutkit-ui` that reuses the debug unit-test classpath and filters to the `stress` package.
 
+## Feature 6: sample app and docs
+- **No Hilt in the sample.** It is an SDK sample, so plain constructor wiring (`SampleDependencies`) shows hosts exactly what they need to create, without a DI framework in the way.
+- **`CheckoutKit.refund(transactionId, amountPaise, refundKey)`** was added so hosts that only keep a `CheckoutResult` (the sheet hides its session) can refund. It is idempotent per refund key and shares the verification code with `CheckoutSession.refund`.
+- **Outcome picker = `FakeGatewayConfig`**: each sample outcome is one configuration (success, pending → success, network blip → success, declined, insufficient funds, invalid UPI ID, timeout, gateway error, payer cancels, success then refund). "Cancel" is shown both ways: the payer rejects in the UPI app (`PAYER_CANCELLED`), or the sheet is closed before paying.
+- **Release build is unsigned** (no keystore in the repo). `assembleRelease` proves R8 + consumer rules; sign locally to install.
+- **Consumer rules** ship with both libraries (core through the KMP `optimization.consumerKeepRules` DSL). The SDK uses no reflection, so the rules only keep the `CheckoutError` names for readable crash reports.
+
 ## Compromises
 _None yet._

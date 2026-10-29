@@ -22,9 +22,13 @@ public sealed interface PaymentMethod {
      * Hold instances only as long as the payment needs them.
      */
     public class Card(
+        /** Card number, digits only (spaces and dashes are tolerated by the validators). */
         public val number: String,
+        /** Expiry month, 1..12. */
         public val expiryMonth: Int,
+        /** Four-digit expiry year. */
         public val expiryYear: Int,
+        /** Card verification value (3 digits, 4 for American Express). Never logged or persisted. */
         public val cvv: String,
     ) : PaymentMethod {
         override val type: String get() = "CARD"

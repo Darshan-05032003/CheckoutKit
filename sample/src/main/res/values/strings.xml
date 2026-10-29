@@ -1,4 +1,42 @@
 <resources>
     <string name="app_name">CheckoutKit Sample</string>
-    <string name="sample_title">CheckoutKit %1$s</string>
+    <string name="sample_merchant">CheckoutKit Demo Store</string>
+    <string name="sample_intro">Every payment here goes to an in-memory sandbox gateway (FakeGateway). No real money moves and nothing leaves the device.</string>
+    <string name="sample_step_outcome">1. Pick what the sandbox gateway does</string>
+    <string name="sample_step_pay">2. Pay</string>
+    <string name="sample_step_result">3. Result</string>
+    <string name="sample_pay">Pay %1$s</string>
+    <string name="sample_magic_inputs">Test inputs: UPI any name@bank. Cards 4242 4242 4242 4242 (ok), 4000 0000 0000 0002 (declined), 4000 0000 0000 9995 (no balance), any future expiry, any CVV.</string>
+    <string name="sample_result_empty">No payment yet. Pick an outcome and tap Pay.</string>
+    <string name="sample_result_success">Success · %1$s · transaction %2$s</string>
+    <string name="sample_result_pending">Pending · transaction %1$s</string>
+    <string name="sample_result_failed">Failed · %1$s · %2$s</string>
+    <string name="sample_result_unresolved">Unresolved (%1$s) · check the status before paying again</string>
+    <string name="sample_result_cancelled">Cancelled · nothing was charged</string>
+    <string name="sample_result_rejected">Rejected · %1$s</string>
+    <string name="sample_refund">Refund</string>
+    <string name="sample_refund_in_progress">Refunding…</string>
+    <string name="sample_refund_done">Refunded · refund %1$s</string>
+    <string name="sample_refund_error">Refund failed · %1$s</string>
+
+    <string name="outcome_success">Success</string>
+    <string name="outcome_success_desc">Captured right away.</string>
+    <string name="outcome_pending">Pending → success</string>
+    <string name="outcome_pending_desc">UPI collect: pending for two status polls, then approved.</string>
+    <string name="outcome_retry">Network blip → success</string>
+    <string name="outcome_retry_desc">First attempt fails with a network error; the SDK retries with the same idempotency key.</string>
+    <string name="outcome_declined">Declined</string>
+    <string name="outcome_declined_desc">The bank declines the payment.</string>
+    <string name="outcome_insufficient">Insufficient funds</string>
+    <string name="outcome_insufficient_desc">The payer\'s account has too little balance.</string>
+    <string name="outcome_invalid_vpa">Invalid UPI ID</string>
+    <string name="outcome_invalid_vpa_desc">The gateway can\'t find this UPI ID.</string>
+    <string name="outcome_timeout">Timeout</string>
+    <string name="outcome_timeout_desc">The gateway never answers; attempts time out, then the SDK reconciles.</string>
+    <string name="outcome_gateway_error">Gateway error</string>
+    <string name="outcome_gateway_error_desc">HTTP 503 on every attempt; retried, then reported.</string>
+    <string name="outcome_cancel">Payer cancels</string>
+    <string name="outcome_cancel_desc">The payer rejects the collect request in their UPI app. (Closing the sheet before paying also cancels.)</string>
+    <string name="outcome_refund">Success, then refund</string>
+    <string name="outcome_refund_desc">Pay, close the sheet, then tap Refund on the result.</string>
 </resources>
