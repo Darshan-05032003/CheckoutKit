@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kover)
+    `maven-publish`
 }
 
 kotlin {
@@ -63,6 +64,24 @@ kover {
             rule("SDK core line coverage") {
                 minBound(80)
             }
+        }
+    }
+}
+
+// maven-publish + KMP creates one publication per target (kotlinMultiplatform root with Gradle
+// module metadata, jvm, android). A local file repo lets us inspect exactly what JitPack will serve.
+publishing {
+    publications.withType<MavenPublication>().configureEach {
+        pom {
+            name.set("CheckoutKit core")
+            description.set("Kotlin Multiplatform payment core: state machine, retries, idempotency, typed errors, gateway contract.")
+            url.set("https://github.com/Darshan-05032003/CheckoutKit")
+        }
+    }
+    repositories {
+        maven {
+            name = "localStaging"
+            url = uri(rootProject.layout.buildDirectory.dir("staging-repo"))
         }
     }
 }

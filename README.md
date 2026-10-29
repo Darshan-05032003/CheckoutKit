@@ -1,5 +1,7 @@
 # CheckoutKit
 
+[![JitPack](https://jitpack.io/v/Darshan-05032003/CheckoutKit.svg)](https://jitpack.io/#Darshan-05032003/CheckoutKit)
+
 **A drop-in Android payment SDK with a Kotlin Multiplatform core.** CheckoutKit gives an Android app
 a Compose payment sheet (UPI, card, wallet) backed by a payment state machine that can't be pushed
 into an illegal state. It retries safely with idempotency keys, reports typed errors, and plugs into
@@ -104,7 +106,8 @@ dependencyResolutionManagement {
 }
 ```
 
-Then the dependency (the UI artifact brings the core with it):
+Then the dependency. The UI artifact brings the core with it; Gradle picks the core's Android
+variant (`checkoutkit-core-android`) automatically through Gradle module metadata:
 
 ```kotlin
 // app/build.gradle.kts
@@ -176,7 +179,9 @@ Amounts are always `Long` paise (₹499.00 = `49_900`). Format them with `Money.
 | `CheckoutSheetOptions(methods, merchantName, secureWindow)`, `PaymentMethodOption`, `CheckoutSheetTestTags` | Sheet options and test tags for host UI tests. |
 
 All public declarations carry KDoc. The public API is locked with Kotlin explicit API mode and the
-binary-compatibility validator (`api/` dumps).
+binary-compatibility validator: `checkoutkit-core/api/jvm/checkoutkit-core.api` and
+`checkoutkit-ui/api/checkoutkit-ui.api` are committed, and `./gradlew apiCheck` (part of `check`) fails
+on any change to them. After an intended API change, run `./gradlew apiDump` and review the diff.
 
 ### FakeGateway magic inputs
 

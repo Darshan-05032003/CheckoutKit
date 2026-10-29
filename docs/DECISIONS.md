@@ -60,5 +60,12 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Release build is unsigned** (no keystore in the repo). `assembleRelease` proves R8 + consumer rules; sign locally to install.
 - **Consumer rules** ship with both libraries (core through the KMP `optimization.consumerKeepRules` DSL). The SDK uses no reflection, so the rules only keep the `CheckoutError` names for readable crash reports.
 
+## Feature 7: JitPack publishing and API lock
+- **Coordinates** `com.github.Darshan-05032003.CheckoutKit:<module>:<tag>`. The Gradle group is set to exactly JitPack's multi-module group, so the KMP Gradle module metadata (root → `checkoutkit-core-android` / `checkoutkit-core-jvm`) needs no rewriting. The version comes from `-Pversion=$VERSION` in `jitpack.yml`; local builds use `1.0.0-SNAPSHOT`.
+- **Published modules:** `checkoutkit-core` (KMP: `kotlinMultiplatform` root, `android` AAR and `jvm` JAR publications, with sources) and `checkoutkit-ui` (release AAR + sources). The sample is never published.
+- **`jitpack.yml`** uses openjdk17 and runs only the two `publishToMavenLocal` tasks (no tests or lint on JitPack), with the Kotlin compiler in-process to keep the builder's memory low.
+- **API lock:** explicit API mode in both modules. The binary-compatibility validator auto-configures the KMP core (`api/jvm`). For `checkoutkit-ui` its `KotlinApiBuildTask`/`KotlinApiCompareTask` are wired by hand to the release classes, because AGP 9's built-in Kotlin doesn't apply `org.jetbrains.kotlin.android` (the plugin found nothing) and Kotlin's experimental ABI validation also found no compilation. `ui.internal` is ignored (Compose emits public synthetic `ComposableSingletons`). Both checks were proven to fail on an added public function.
+- **Tags are immutable:** a failed JitPack build is fixed with a new tag (`v1.0.1`, …), never by moving or deleting one.
+
 ## Compromises
 _None yet._

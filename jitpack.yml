@@ -1,0 +1,9 @@
+# JitPack build for CheckoutKit (https://jitpack.io/#Darshan-05032003/CheckoutKit)
+# Publishes the two library modules only: the KMP core (root + android + jvm publications) and the
+# Compose UI AAR. Coordinates: com.github.Darshan-05032003.CheckoutKit:<module>:<tag>
+jdk:
+  - openjdk17
+before_install:
+  - yes | sdkmanager --licenses > /dev/null 2>&1 || true
+install:
+  - ./gradlew :checkoutkit-core:publishToMavenLocal :checkoutkit-ui:publishToMavenLocal -Pversion=$VERSION -Pkotlin.compiler.execution.strategy=in-process --no-daemon --stacktrace

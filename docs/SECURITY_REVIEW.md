@@ -151,3 +151,22 @@ name is given in brackets.
 - Scope for improvement:
   - In a real app, refunds belong on the merchant's backend, not in the client. `CheckoutKit.refund` exists for demos and back-office tools.
   - The sample's last result lives in memory (only the selected outcome survives process death). A real host should persist orders and their idempotency keys (PayFlow uses Room).
+
+## Feature: JitPack publishing and API lock
+- Attacks tried:
+  - Supply chain: what exactly gets built and served, and from what source. Could a consumer get a different binary for the same coordinates? Could private files or secrets end up in the published artifacts?
+  - Dependency confusion and version drift: consumers on `main-SNAPSHOT` or a moving branch instead of a pinned tag.
+  - Accidental API breaks: a public signature changed in a patch release, breaking binary compatibility for apps like PayFlow.
+  - Leaky API surface: internal classes or compiler-generated synthetics becoming public API by accident.
+  - Over-broad transitive exposure: what consumers get on their compile classpath.
+- What broke:
+  - (Medium) The validator silently produced no API dump for `checkoutkit-ui` (AGP 9 built-in Kotlin), so the UI API was not locked at all on the first try. Fixed by wiring the validator by hand, and proven by a probe function that made `apiCheck` fail.
+  - (Low) Compose's public synthetic `ComposableSingletons$CheckoutSheetContentKt` from the `internal` package appeared in the first UI dump. Excluded.
+- Fixed now:
+  - Both modules are locked: committed `.api` dumps plus `apiCheck` in `check`, on top of explicit API mode.
+  - Published artifacts are built by JitPack from the immutable git tag. The `.gitignore` keeps `local.properties`, keystores, `google-services.json` and the private notes out of git, so they can't reach the build. Pre-push checks (`git grep` for key patterns, `git ls-files` for private files) run before every push and tag.
+  - The README pins an exact tag (`v1.0.0`), not a snapshot. Tags are never moved or deleted.
+  - The UI exposes only `checkoutkit-core` as `api`. Compose, Material 3 and Lifecycle are runtime-scoped `implementation` dependencies, so hosts don't compile against them through CheckoutKit.
+- Scope for improvement:
+  - JitPack artifacts are not GPG-signed and there is no checksum attestation. A production SDK would publish signed artifacts to Maven Central (and consumers could enable Gradle dependency verification).
+  - Tag signing (`git tag -s`) would let consumers verify that the source behind a release came from the author.
