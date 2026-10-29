@@ -1,0 +1,100 @@
+<resources>
+    <!-- Sheet chrome -->
+    <string name="checkoutkit_sheet_title">Checkout</string>
+    <string name="checkoutkit_pay_amount">Pay %1$s</string>
+    <string name="checkoutkit_amount_label">Amount to pay</string>
+    <string name="checkoutkit_close">Close</string>
+    <string name="checkoutkit_cancel">Cancel</string>
+    <string name="checkoutkit_done">Done</string>
+    <string name="checkoutkit_check_status">Check status</string>
+    <string name="checkoutkit_secured_by">Secured by CheckoutKit · sandbox</string>
+
+    <!-- Tabs -->
+    <string name="checkoutkit_tab_upi">UPI</string>
+    <string name="checkoutkit_tab_card">Card</string>
+    <string name="checkoutkit_tab_wallet">Wallet</string>
+
+    <!-- UPI -->
+    <string name="checkoutkit_vpa_label">UPI ID</string>
+    <string name="checkoutkit_vpa_placeholder">name@bank</string>
+    <string name="checkoutkit_vpa_hint">A collect request will be sent to your UPI app.</string>
+
+    <!-- Card -->
+    <string name="checkoutkit_card_number_label">Card number</string>
+    <string name="checkoutkit_expiry_label">Expiry (MM/YY)</string>
+    <string name="checkoutkit_cvv_label">CVV</string>
+    <string name="checkoutkit_card_brand">Card type: %1$s</string>
+    <string name="checkoutkit_cvv_hidden_description">CVV, hidden while typing</string>
+
+    <!-- Wallet -->
+    <string name="checkoutkit_wallet_choose">Choose a wallet</string>
+
+    <!-- Phases -->
+    <string name="checkoutkit_processing_title">Processing payment</string>
+    <string name="checkoutkit_processing_message">Don\'t close this screen or press back.</string>
+    <string name="checkoutkit_processing_retry">Retrying (attempt %1$d)</string>
+    <string name="checkoutkit_pending_title">Waiting for confirmation</string>
+    <string name="checkoutkit_pending_message">Approve the payment in your UPI app. This screen updates on its own.</string>
+    <string name="checkoutkit_success_title">Payment successful</string>
+    <string name="checkoutkit_success_message">%1$s paid. Transaction ID: %2$s</string>
+    <string name="checkoutkit_unresolved_title">We couldn\'t confirm your payment</string>
+    <string name="checkoutkit_unresolved_message">Don\'t pay again. If money was debited it will show up as paid or be refunded automatically. You can check the status now or later.</string>
+    <string name="checkoutkit_progress_description">Payment in progress</string>
+
+    <!-- Errors: titles -->
+    <string name="checkoutkit_error_network_title">No connection</string>
+    <string name="checkoutkit_error_timeout_title">This is taking too long</string>
+    <string name="checkoutkit_error_declined_title">Payment declined</string>
+    <string name="checkoutkit_error_insufficient_funds_title">Insufficient balance</string>
+    <string name="checkoutkit_error_invalid_vpa_title">Check your UPI ID</string>
+    <string name="checkoutkit_error_invalid_card_title">Check your card details</string>
+    <string name="checkoutkit_error_card_expired_title">Card expired</string>
+    <string name="checkoutkit_error_limit_exceeded_title">Limit reached</string>
+    <string name="checkoutkit_error_authentication_failed_title">Verification failed</string>
+    <string name="checkoutkit_error_rate_limited_title">Too many attempts</string>
+    <string name="checkoutkit_error_gateway_title">Payment service unavailable</string>
+    <string name="checkoutkit_error_mismatch_title">Payment not confirmed</string>
+    <string name="checkoutkit_error_generic_title">Something went wrong</string>
+
+    <!-- Errors: messages -->
+    <string name="checkoutkit_error_network_message">Check your internet connection and try again.</string>
+    <string name="checkoutkit_error_timeout_message">The bank didn\'t respond in time. If money was debited it will be refunded automatically.</string>
+    <string name="checkoutkit_error_declined_message">Your bank declined this payment. Try another payment method.</string>
+    <string name="checkoutkit_error_insufficient_funds_message">Your account doesn\'t have enough balance. Try another account or method.</string>
+    <string name="checkoutkit_error_invalid_vpa_message">This UPI ID doesn\'t look right. Check it and try again.</string>
+    <string name="checkoutkit_error_invalid_card_message">The card details are not valid. Check them and try again.</string>
+    <string name="checkoutkit_error_card_expired_message">This card has expired. Use another card.</string>
+    <string name="checkoutkit_error_limit_exceeded_message">This payment is over your bank\'s limit. Try a smaller amount or another method.</string>
+    <string name="checkoutkit_error_authentication_failed_message">The PIN or OTP was incorrect. Try again.</string>
+    <string name="checkoutkit_error_rate_limited_message">Please wait a moment and try again.</string>
+    <string name="checkoutkit_error_gateway_message">We couldn\'t reach the payment service. Try again in a moment.</string>
+    <string name="checkoutkit_error_mismatch_message">We couldn\'t verify this payment. Please contact the merchant before paying again.</string>
+    <string name="checkoutkit_error_invalid_request_message">This payment can\'t be processed. Please contact the merchant.</string>
+    <string name="checkoutkit_error_unknown_message">An unexpected error occurred. Please contact the merchant.</string>
+
+    <!-- Recovery actions -->
+    <string name="checkoutkit_action_retry">Try again</string>
+    <string name="checkoutkit_action_change_method">Use another method</string>
+    <string name="checkoutkit_action_edit_details">Edit details</string>
+    <string name="checkoutkit_action_contact_support">Close</string>
+
+    <!-- Field errors -->
+    <string name="checkoutkit_field_vpa_empty">Enter your UPI ID</string>
+    <string name="checkoutkit_field_vpa_format">Enter a UPI ID like name@bank</string>
+    <string name="checkoutkit_field_vpa_characters">Use only English letters, digits, dots, dashes and underscores</string>
+    <string name="checkoutkit_field_vpa_too_long">This UPI ID is too long</string>
+    <string name="checkoutkit_field_card_empty">Enter your card number</string>
+    <string name="checkoutkit_field_card_characters">Card numbers contain digits only</string>
+    <string name="checkoutkit_field_card_length">This card number is too short or too long</string>
+    <string name="checkoutkit_field_card_checksum">This card number is not valid</string>
+    <string name="checkoutkit_field_card_brand">This card type is not supported</string>
+    <string name="checkoutkit_field_expiry_empty">Enter the expiry date</string>
+    <string name="checkoutkit_field_expiry_format">Use MM/YY</string>
+    <string name="checkoutkit_field_expiry_month">Enter a month from 01 to 12</string>
+    <string name="checkoutkit_field_expiry_expired">This card has expired</string>
+    <string name="checkoutkit_field_expiry_future">Check the expiry year</string>
+    <string name="checkoutkit_field_cvv_empty">Enter the CVV</string>
+    <string name="checkoutkit_field_cvv_invalid">Enter the 3 or 4 digit CVV</string>
+    <string name="checkoutkit_field_wallet_missing">Choose a wallet</string>
+    <string name="checkoutkit_field_generic">Check this field</string>
+</resources>

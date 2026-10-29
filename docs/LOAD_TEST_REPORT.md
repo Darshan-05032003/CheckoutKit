@@ -73,7 +73,7 @@ excluded from `allTests`.
 - Results (numbers):
   - 10k mixed: 568 to 617 ms wall time, 70 to 115 MB transient heap, 20,505 charge calls; exactly 5,000 successes = 5,000 captures (no double capture, one capture per key).
   - Polling storm: 863 to 1,045 ms; exactly 20,000 status calls (4.0 per payment, as configured); all 5,000 resolved to Success.
-  - Spike sweep after the fix (success / unresolved / failed-but-captured):
+  - Spike sweep after the fix:
 
     | Spike rate | Success | Unresolved | Failed but captured | Charge calls | Status calls |
     |---|---|---|---|---|---|
@@ -83,7 +83,7 @@ excluded from `allTests`.
     | 50 % | 1,968 | 32 | 0 | 3,532 | 444 |
     | 70 % | 1,747 | 253 | 0 | 4,368 | 1,516 |
     | 90 % | 948 | 1,052 | 0 | 5,418 | 3,968 |
-  - Before the fix, the same sweep reported Timeout failures for payments that were captured: 2 at 10 % spikes, 20 at 30 %, and at 90 % 74 % of the (all captured) payments were reported as failed.
+  - Before the fix the sweep failed its "no failed-but-captured" assertion at the first spiky rate: **2 of 2,000** payers at 10 % spikes were told "failed" although the gateway had captured their money (the test stops at the first failing rate). A first fix with a single status lookup cleared 10 % but still left **20 of 2,000** at 30 %. The final fix (lookup retried under the policy, plus `Unresolved`) gives 0 at every rate.
 - What broke:
   - **Correctness under latency spikes.** When the gateway captured the money but the response arrived after the attempt timeout, the SDK retried, timed out again and declared the payment failed.
 - Failure flow (step by step):
@@ -95,3 +95,22 @@ excluded from `allTests`.
   - Reconcile before failing: look the payment up by idempotency key (retried under the same policy). Then report Success / Pending if found, Failed if unknown to the gateway, and `Unresolved` (state kept `Processing`, never cached) if the gateway is unreachable.
   - Breaking point: success stays at 98 % or more up to 50 % spikes. Beyond about 70 % the gateway is effectively down and `Unresolved` grows, but the outcome is never wrongly reported as failed.
   - Recommendation for hosts: show `Unresolved` as "We're confirming your payment, don't pay again" and call `checkStatus()` later.
+
+## Feature: Compose payment sheet
+- Scope: these are on-device (JVM) simulations of a heavy user and of a long-lived host screen. UI stress tests live in `checkoutkit-ui/src/test/.../ui/stress`, are excluded from `testDebugUnitTest`, and run with `./gradlew stressTest`.
+- Scenario and scale:
+  - 100,000 random inputs (1 in 500 of them 10 to 100 KB long; markup, control, RTL, Devanagari, Cyrillic, Arabic-Indic digits, emoji) through all five validators (card, VPA, expiry, CVV, money parser).
+  - 1,000,000 Luhn checks on generated 16-digit numbers.
+  - One sheet: 10,000 keystrokes followed by 1,000 Pay taps while the gateway takes 500 ms.
+  - 1,000 sheets opened, paid and closed in a row on one view model (leak check: jobs, results channel, saved state, idempotency entries).
+- Results (numbers):
+  - Validators: 304 ms for 100k inputs x 5 validators (19 MB transient); 126 random inputs happened to be valid.
+  - Luhn: 156 ms for 1M checks; 100,219 passed (the expected ~10 %).
+  - Keystroke + tap storm: 20 ms of processing, exactly **1** gateway charge, final phase Success.
+  - 1,000 sequential sheets: 652 ms, heap delta about 0 MB after GC, 1,000 results delivered exactly once, 1,000 captures, 0 saved-state keys left behind.
+- What broke:
+  - Nothing. Headroom is large: validation costs about 3 µs per input even with 100 KB strings, because the view model caps field lengths before validating and validators check length before running regexes.
+- Failure flow (step by step):
+  - N/A. The pre-existing protections held: input caps → validators → `phase == Form` guard → idempotency store.
+- Fix applied / recommendation:
+  - None needed. Keep the length caps in the view model if fields are added; they are what keeps a 100 KB paste cheap.

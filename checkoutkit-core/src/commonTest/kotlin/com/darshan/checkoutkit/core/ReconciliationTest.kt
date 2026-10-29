@@ -137,4 +137,26 @@ class ReconciliationTest {
         assertNull(withTimeoutOrNull(1.seconds) { fake.charge(charge) })
         assertEquals(1, fake.capturedPayments.size) // captured, but the caller never heard back
     }
+
+    @Test
+    fun resumedSessionAfterProcessDeath_reconcilesByTheSavedKey() = runTest {
+        val gateway = ScriptedGateway().onStatus({ GatewayResult.Succeeded("txn_before_death", 7_500) })
+        val key = IdempotencyKey("saved-before-death")
+        val session = kit(gateway).resumeSession(request, key)
+        assertEquals(PaymentState.Processing(1), session.state.value)
+        assertEquals(CheckoutResult.Success("txn_before_death", 7_500), session.checkStatus())
+        assertEquals(key, gateway.statusQueries.single().idempotencyKey)
+        assertEquals(0, gateway.chargeCount) // never charged again
+    }
+
+    @Test
+    fun resumedSession_whoseChargeNeverLanded_canBeSubmittedWithTheSameKey() = runTest {
+        val gateway = ScriptedGateway()
+        val key = IdempotencyKey("saved-before-death")
+        val session = kit(gateway).resumeSession(request, key)
+        assertEquals(CheckoutResult.Failed(CheckoutError.Timeout), session.checkStatus())
+        val fresh = kit(gateway).createSession(request, key)
+        assertTrue(fresh.submit(upi) is CheckoutResult.Success)
+        assertEquals(key, gateway.requests.single().idempotencyKey)
+    }
 }

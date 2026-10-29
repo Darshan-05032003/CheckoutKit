@@ -43,5 +43,15 @@ Decisions taken during the build, with the reasoning, so nothing is a surprise l
 - **Full refunds only**, single-flight per session, refund key = `<key>-rf`. A failed refund leaves the session `Success`.
 - **FakeGateway lives in `commonMain`** (shipped in the SDK) so hosts can use it in their own tests and demos, the way Stripe ships test cards. It simulates latency split into request and response legs (spikes on the response leg, i.e. "captured but the answer is late"), server-side idempotency, pending resolution, refunds, NPCI-style failures and magic test inputs.
 
+## Feature 5: Compose payment sheet
+- **Public API:** `rememberCheckoutSheet(kit, options) { result -> }` returns a `CheckoutSheetState` with `launch(request)` / `dismiss()`; `CheckoutSheet(state)` renders it. This follows the `rememberModalBottomSheetState` + `ModalBottomSheet` pattern. A separate Activity-based `CheckoutKit.launch(activity)` was not built: hosts are Compose apps and the sheet must share the host's ViewModel scope.
+- **The result is delivered once, when the sheet closes** (Done, Close, swipe), so a host never processes an intermediate state. While waiting the payer can close a pending payment (→ `Pending`) but not a processing one.
+- **An AndroidX ViewModel inside the library** (keyed, created with a factory) survives rotation. `SavedStateHandle` keeps request, key, tab, VPA and wallet for process death, never card data. In-flight payments are reconciled with the new `CheckoutKit.resumeSession()`.
+- **Validators live in the KMP core** (`validation` package), so any client (or a backend in Kotlin) can reuse them. Card brands: Visa, Mastercard (incl. 2-series), American Express, RuPay (60, 65, 81, 82, 508).
+- **Card expiry is evaluated in IST** (configurable offset) with a dependency-free civil-calendar conversion in common code.
+- **`FLAG_SECURE` on by default** through `ModalBottomSheetProperties(securePolicy = SecureOn)`, with an opt-out for hosts that need screenshots (demos).
+- **`CheckoutSheetTestTags` is public** so host apps (PayFlow) can drive the sheet in their own UI tests.
+- **UI stress tests** run through a `stressTest` task in `checkoutkit-ui` that reuses the debug unit-test classpath and filters to the `stress` package.
+
 ## Compromises
 _None yet._

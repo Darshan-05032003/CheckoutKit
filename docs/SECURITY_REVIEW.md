@@ -86,7 +86,7 @@ name is given in brackets.
   - Status-query failures during polling (network exceptions, adapter bugs) and gateways that never answer status calls.
   - Gateway reporting "cancelled" for a charge that was never pending.
 - What broke:
-  - **High, found by the load test and fixed:** when every attempt timed out after the gateway had already captured, the session reported `Failed(Timeout)`. Under 10 % latency spikes, 2 of 2,000 payers were told "failed" although they had paid (they would likely pay again: a double charge). Root cause: no reconciliation after an unknown outcome.
+  - **High, found by the load test and fixed:** when every attempt timed out after the gateway had already captured, the session reported `Failed(Timeout)`. Under 10 % latency spikes, 2 of 2,000 payers were told "failed" although they had paid (they would likely pay again: a double charge). A single status lookup still left 20 of 2,000 at 30 % spikes. Root cause: no (or not robust enough) reconciliation after an unknown outcome.
   - **Medium, design-time:** a gateway returning a blank or huge transaction id would make `PaymentEvent.Succeed` throw, crashing the checkout instead of failing it.
 - Fixed now:
   - After a retryable final error (timeout/network), the session looks the payment up by idempotency key (retried under the policy) before deciding. If found: Success / Pending. If the gateway says it doesn't know the payment: Failed. If the gateway is unreachable: new outcome `CheckoutResult.Unresolved`, with the state left in `Processing` and nothing replayed, so the host must reconcile with `checkStatus()` [`timedOutButCapturedAtTheGateway_isReportedAsSuccess`, `gatewayUnreachableForTheLookupToo_isUnresolved_notFailed`, `checkStatusWhileProcessing_andTheGatewayNeverSawTheCharge_failsWithTimeout`, stress `latencySpikeSweep_findTheBreakingPoint` now asserts 0 "failed but captured" at every spike rate].
@@ -99,3 +99,33 @@ name is given in brackets.
   - `Unresolved` puts the final reconciliation on the host. A production backend would also receive gateway webhooks.
   - Only full refunds are supported. Partial refunds need amount tracking per refund.
   - `FakeGateway` is a sandbox only. A real gateway adapter must also enforce TLS pinning and request signing on its side.
+
+## Feature: Compose payment sheet
+- Attacks tried:
+  - Rapid double taps on Pay (1,000 taps), and Pay pressed again during processing.
+  - Closing mid-payment: back press, swipe down, tap outside, `dismiss()` from the host.
+  - Process death mid-payment: the request reached the gateway, the process was killed before the answer arrived, and the activity was recreated from saved state.
+  - Rotation while processing (the view model survives; `launch()` again is ignored).
+  - Card data leakage: saved instance state (process-death bundle), `toString()`/logs, fields left filled after payment, screenshots, screen recording, recent-apps thumbnail, IME learning/autocorrect, clipboard copy of the CVV.
+  - Tapjacking: an overlay window obscuring the sheet.
+  - Malicious input: 100 KB pastes, Arabic-Indic digits, Cyrillic homoglyph VPAs, RTL override, newlines/tabs in the VPA, letters in card fields, `javascript:` VPAs.
+  - SDK misuse: empty or duplicated method lists, launching twice, offering a method the host disabled.
+- What broke:
+  - Nothing reached a double charge or a leak in the tests. Design-time findings, handled before commit:
+  - (High) Restoring after process death by calling `submit()` again would need the card details, which are deliberately not saved. Instead the sheet resumes with the saved key and reconciles via the new `CheckoutKit.resumeSession()` + `checkStatus()`, without ever charging again.
+  - (Medium) A visible sheet re-launched after rotation would start a new attempt with a new key, a possible double charge. `launch()` is ignored while the sheet is open.
+- Fixed now:
+  - One charge for 1,000 taps; Pay only works in the form phase [`doubleTapOnPay_chargesOnce`, stress `thousandPayTapsAndTenThousandKeystrokes_chargeOnce`].
+  - The sheet can't be closed while processing: back, swipe and outside-tap are disabled and the Close button is hidden [`closeWhileProcessing_isIgnored`, `whileProcessing_thePayButtonIsGone_andCloseIsHidden`].
+  - Process death: request, key, tab, VPA and wallet are saved; the card number, expiry and CVV never are. In-flight payments are reconciled by key [`processDeathMidPayment_isReconciledWithTheSavedKey_withoutChargingAgain`, `savedState_neverContainsCardNumberOrCvv`, `resumedSessionAfterProcessDeath_reconcilesByTheSavedKey`].
+  - Card fields are wiped as soon as an attempt ends [`validCard_pays_andCardDataIsWipedAfterwards`]; `PaymentMethod.Card.toString()` is masked.
+  - `FLAG_SECURE` is on the sheet's window by default (`CheckoutSheetOptions.secureWindow`) [`sheetWindow_isSecureByDefault`, `secureWindow_canBeTurnedOffByTheHost`].
+  - `filterTouchesWhenObscured` is set on the sheet's view [`sheetContent_filtersTouchesWhenObscured`].
+  - CVV: `PasswordVisualTransformation` (Compose then disables copy/cut) and `KeyboardType.NumberPassword`. All payment fields have autocorrect off [`cardFlow_masksTheCvv_andPays` asserts the `Password` semantics].
+  - Inputs are filtered to ASCII digits and capped (card 19, CVV 4, expiry 4, VPA 255, no control chars); validators reject homoglyphs and RTL [`cardInputs_areFilteredAndCapped`, `VpaValidatorTest`, `CardValidatorTest`, stress `hundredThousandHostileInputs_throughEveryValidator`].
+  - Card expiry is judged in IST from the injected clock, so a device in another timezone can't pass an October card on 1 November IST [`monthBoundary_usesIndianStandardTime`].
+  - The SDK writes no logs at all (no `android.util.Log`, no `println` in main sources).
+- Scope for improvement:
+  - The card number field still allows copy (useful for the payer). A stricter mode could disable it.
+  - `FLAG_SECURE` covers only the sheet window. Hosts should also secure their own payment screens (PayFlow does).
+  - Card details reach the gateway in memory as `PaymentMethod.Card`. A production SDK would tokenise them in a PCI-compliant iframe/SDK and never touch the PAN.

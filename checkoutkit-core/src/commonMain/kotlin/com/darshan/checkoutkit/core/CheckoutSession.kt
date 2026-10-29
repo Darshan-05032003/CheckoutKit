@@ -45,8 +45,9 @@ public class CheckoutSession internal constructor(
     private val gateway: PaymentGateway,
     private val config: CheckoutConfig,
     private val store: IdempotencyStore<CheckoutResult>,
+    initialState: PaymentState = PaymentState.Created,
 ) {
-    private val holder = PaymentStateHolder(clock = config.clock)
+    private val holder = PaymentStateHolder(initial = initialState, clock = config.clock)
     private val executor = RetryExecutor(config.retryPolicy, config.random)
     private val refundMutex = Mutex()
     private val chargesInFlight = MutableStateFlow(0)

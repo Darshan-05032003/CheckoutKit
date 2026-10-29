@@ -4,6 +4,7 @@ import com.darshan.checkoutkit.core.gateway.PaymentGateway
 import com.darshan.checkoutkit.core.idempotency.IdempotencyKey
 import com.darshan.checkoutkit.core.idempotency.IdempotencyStore
 import com.darshan.checkoutkit.core.idempotency.InMemoryIdempotencyStore
+import com.darshan.checkoutkit.core.state.PaymentState
 
 /**
  * Entry point of the SDK. Create one per gateway (usually one per app) and start a
@@ -32,4 +33,13 @@ public class CheckoutKit(
         request: CheckoutRequest,
         idempotencyKey: IdempotencyKey = IdempotencyKey.generate(),
     ): CheckoutSession = CheckoutSession(request, idempotencyKey, gateway, config, idempotencyStore)
+
+    /**
+     * Re-opens a checkout whose charge may already have been sent, for example after process death
+     * while the payment was in flight. The session starts in `Processing`; call
+     * [CheckoutSession.checkStatus] to reconcile it with the gateway by [idempotencyKey] — it is
+     * never charged again from here.
+     */
+    public fun resumeSession(request: CheckoutRequest, idempotencyKey: IdempotencyKey): CheckoutSession =
+        CheckoutSession(request, idempotencyKey, gateway, config, idempotencyStore, initialState = PaymentState.Processing(1))
 }
